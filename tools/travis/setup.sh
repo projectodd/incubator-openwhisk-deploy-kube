@@ -24,11 +24,13 @@ sudo chmod 755 /usr/local/bin/oc
 # Start OpenShift
 oc cluster up
 
-# Wait until we have a ready node in minikube
+oc login -u system:admin
+
+# Wait until we have a ready node in openshift
 TIMEOUT=0
 TIMEOUT_COUNT=60
 until [ $TIMEOUT -eq $TIMEOUT_COUNT ]; do
-  if [ -n "$(/usr/local/bin/oc get nodes | grep Ready)" ]; then
+  if [ -n "$(oc get nodes | grep Ready)" ]; then
     break
   fi
 
@@ -43,4 +45,6 @@ if [ $TIMEOUT -eq $TIMEOUT_COUNT ]; then
 fi
 
 echo "openshift is deployed and reachable"
-/usr/local/bin/oc describe nodes
+oc describe nodes
+
+oc login -u developer -p any
