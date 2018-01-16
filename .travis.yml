@@ -16,7 +16,7 @@ before_install:
 
 script:
   - ./tools/travis/scancode.sh
-  - ./tools/travis/build.sh
+  - ./tools/travis/openshift-build.sh
   - ./tools/travis/collect-logs.sh
   - ./tools/travis/box-upload.py "logs" "deploy-kube-$TRAVIS_BUILD_ID-$TRAVIS_BRANCH.tar.gz"
 
