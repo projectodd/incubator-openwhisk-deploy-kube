@@ -24,6 +24,9 @@ couchdbHealthCheck () {
   if [ "$PASSED" = false ]; then
     echo "Failed to finish deploying CouchDB"
 
+    REPLICA_SET=$(oc get rs -o wide --show-all | grep "couchdb" | awk '{print $1}')
+    oc describe rs $REPLICA_SET
+    oc describe pod $POD_NAME
     oc logs $POD_NAME
     exit 1
   fi
