@@ -181,17 +181,19 @@ spec:
             path: "/ping"
             port: 8080
             scheme: "HTTP"
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 10
-          timeoutSeconds: 1
+          timeoutSeconds: 10
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: "/ping"
             port: 8080
             scheme: "HTTP"
-          initialDelaySeconds: 5
+          initialDelaySeconds: 10
           periodSeconds: 5
-          timeoutSeconds: 1
+          timeoutSeconds: 10
+          failureThreshold: 5
       initContainers:
       - name: wait-for-services
         image: busybox
