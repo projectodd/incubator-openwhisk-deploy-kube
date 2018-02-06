@@ -15,6 +15,22 @@ spec:
       name: http
 ---
 apiVersion: v1
+kind: Route
+metadata:
+  name: openwhisk
+  labels:
+    name: controller
+spec:
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: controller
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: controller.config
