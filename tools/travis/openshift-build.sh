@@ -128,6 +128,30 @@ jobHealthCheck () {
   echo "$1 completed"
 }
 
+invokerHealthCheck () {
+  PASSED=false
+  TIMEOUT=0
+  until [ $TIMEOUT -eq 60 ]; do
+    if [ -n "$(oc logs controller-0 | grep "invoker status changed to 0 -> Healthy")" ]; then
+      PASSED=true
+      break
+    fi
+
+    let TIMEOUT=TIMEOUT+1
+    sleep 5
+  done
+
+  if [ "$PASSED" = false ]; then
+    echo "Failed to find a healthy Invoker"
+
+    oc logs controller-0
+    oc logs invoker-0
+    exit 1
+  fi
+
+  echo "Invoker online and healthy"
+}
+
 
 #################
 # Main body of script -- deploy OpenWhisk
@@ -168,6 +192,8 @@ deploymentHealthCheck "nginx"
 
 jobHealthCheck "install-catalog"
 
+invokerHealthCheck
+
 # configure wsk CLI
 AUTH_SECRET=$(oc get secret whisk.auth -o yaml | grep "system:" | awk '{print $2}' | base64 --decode)
 wsk property set --auth $AUTH_SECRET --apihost $(oc get route/openwhisk --template={{.spec.host}})
@@ -190,8 +216,6 @@ EOL
 
 wsk -i action create hello hello.js
 
-sleep 5
-
 # run the new hello world action
 RESULT=$(wsk -i action invoke --blocking hello | grep "\"status\": \"success\"")
 
@@ -202,7 +226,7 @@ if [ -z "$RESULT" ]; then
   oc logs controller-0
 
   echo " ----------------------------- invoker logs ---------------------------"
-  oc logs -l name=invoker
+  oc logs invoker-0
   exit 1
 fi
 
