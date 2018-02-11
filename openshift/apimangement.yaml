@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: install-apimanagement
+  namespace: openwhisk
+spec:
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      name: install-apimanagement
+    spec:
+      containers:
+      - name: apimanagement
+        image: docker.io/openwhisk/kube-routemgmt
+        env:
+          - name: "WHISK_CLI_VERSION"
+            valueFrom:
+              configMapKeyRef:
+                name: whisk.config
+                key: whisk_cli_version_tag
+          - name: "WHISK_AUTH"
+            valueFrom:
+              secretKeyRef:
+                name: whisk.auth
+                key: system
+          - name: "WHISK_API_HOST_NAME"
+            valueFrom:
+              configMapKeyRef:
+                name: apigateway
+                key: api_host
+          - name: "WHISK_NAMESPACE"
+            valueFrom:
+              configMapKeyRef:
+                name: whisk.config
+                key: whisk_system_namespace
+          - name: "WHISK_API_GATEWAY_HOST_V2"
+            value: "http://$(APIGATEWAY_SERVICE_HOST):$(APIGATEWAY_SERVICE_PORT_API)/v2"
+
+      restartPolicy: Never
