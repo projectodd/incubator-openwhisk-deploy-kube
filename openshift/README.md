@@ -1,10 +1,23 @@
 Beneath this directory are the resource files necessary to deploy a
-working OpenWhisk environment to OpenShift, specifically
-[minishift](https://github.com/minishift/minishift/).
+working OpenWhisk environment to OpenShift. There is also an OpenShift
+[template](extras/template.yml) comprised of those resources built
+from [a simple shell script](../tools/openshift-template.sh). 
 
-# Installation
+This single command will deploy OpenWhisk in your OpenShift project
+using the latest template in this repo:
 
-First, start minishift and fix a networking bug in current releases:
+    oc process -f http://bit.ly/openwhisk-template | oc create -f -
+
+It'll take a few minutes, but once all the pods are running, you can
+configure the `wsk` CLI to use your cluster:
+
+    AUTH_SECRET=$(oc get secret whisk.auth -o yaml | grep "system:" | awk '{print $2}' | base64 --decode)
+    wsk property set --auth $AUTH_SECRET --apihost $(oc get route/openwhisk --template={{.spec.host}})
+
+# Installing on minishift
+
+First, start [minishift](https://github.com/minishift/minishift/) and
+fix a networking bug in current releases:
 
 ```
 minishift start --memory 8GB
