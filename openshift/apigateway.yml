@@ -6,11 +6,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: apigateway
-  namespace: openwhisk
 data:
+  # TODO remove form hardcode
   api_host: openwhisk-openwhisk.192.168.64.58.nip.io
+  # TODO remove form hardcode
   apigw_url: http://apigateway-openwhisk.192.168.64.58.nip.io
-  redis_host: "redis.openwhisk.svc.cluster.local"
+  redis_host: "redis"
   redis_port: "6379"
 ########################################
 # START REDIS Deployment
@@ -22,7 +23,6 @@ metadata:
   labels:
     app: redis
   name: redis
-  namespace: openwhisk
 spec:
   ports:
   - name: redis-6379
@@ -36,7 +36,6 @@ metadata:
   labels:
     app: redis
   name: redis
-  namespace: openwhisk
 spec:
   replicas: 1
   template:
@@ -65,7 +64,6 @@ metadata:
   name: apigateway
   labels:
     name: apigateway
-  namespace: openwhisk
 spec:
   selector:
     name: apigateway
@@ -79,7 +77,6 @@ apiVersion:  apps.openshift.io/v1
 kind: DeploymentConfig
 metadata:
   name: apigateway
-  namespace: openwhisk
   labels:
     name: apigateway
 spec:
@@ -125,7 +122,6 @@ metadata:
   labels:
     app: apigateway
   name: apigateway
-  namespace: openwhisk
 spec:
   port:
     targetPort: mgmt  

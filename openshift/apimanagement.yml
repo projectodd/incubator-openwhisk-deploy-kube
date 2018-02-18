@@ -2,7 +2,6 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: install-apimanagement
-  namespace: openwhisk
 spec:
   activeDeadlineSeconds: 600
   template:
