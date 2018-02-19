@@ -338,17 +338,19 @@ objects:
               path: "/ping"
               port: 8080
               scheme: "HTTP"
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 1
+            timeoutSeconds: 10
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: "/ping"
               port: 8080
               scheme: "HTTP"
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 5
-            timeoutSeconds: 1
+            timeoutSeconds: 10
+            failureThreshold: 5
         initContainers:
         - name: wait-for-services
           image: busybox
@@ -494,10 +496,8 @@ objects:
     name: invoker
   data:
     init: |
-      export ORDINAL=$(hostname | cut -d'-' -f2)
-      echo "Waiting for controller to be available"
-      until $(curl --output /dev/null --silent --head --fail http://controller:8080/ping); do printf '.'; sleep 1; done
-      export COMPONENT_NAME=${ORDINAL}
+      export COMPONENT_NAME=$(hostname | cut -d'-' -f2)
+      # Dynamically determine API gateway host
       export TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
       export NAMESPACE="$(cat /run/secrets/kubernetes.io/serviceaccount/namespace)"
       export APIGW_HOST=$(curl -s --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer ${TOKEN}" "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/oapi/v1/namespaces/${NAMESPACE}/routes/openwhisk?pretty=true" | grep '"host":' | head -n 1 | awk -F '"' '{print $4}')
@@ -542,6 +542,9 @@ objects:
         - name: wait-for-services
           image: busybox
           command: ['sh', '-cu', 'echo "$COUCHDB_SERVICE_HOST $ZOOKEEPER_SERVICE_HOST $KAFKA_SERVICE_HOST"']
+        - name: wait-for-controller
+          image: busybox
+          command: ['sh', '-c', 'until wget -T 5 --spider http://controller:8080/ping; do echo waiting for controller; sleep 2; done;']
   
         containers:
         - name: invoker
