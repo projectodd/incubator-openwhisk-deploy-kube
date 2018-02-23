@@ -9,15 +9,39 @@ parameters:
 - name: CONTROLLER_INSTANCES
   description: The desired number of controllers
   value: "2"
+  required: true
 - name: CONTROLLER_HA
   description: Boolean denoting whether HA mode
   value: "TRUE"
+  required: true
 - name: CONTROLLER_LOCALBOOKKEEPING
   description: Boolean denoting whether load balancer data is local or shared
   value: "FALSE"
+  required: true
 - name: AKKA_CLUSTER_SEED_NODES
   description: Hostnames of akka seed nodes
   value: "controller-0.controller controller-1.controller"
+  required: true
+- name: COUCHDB_USER
+  description: CouchDB Username
+  generate: expression
+  from: "user[A-Z0-9]{3}"
+  required: true
+- name: COUCHDB_PASSWORD
+  description: CouchDB Password
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+  required: true
+- name: WHISK_SYSTEM_AUTH
+  description: OpenWhisk Auth token for whisk.system account
+  generate: expression
+  from: "789c46b1-71f6-4ed5-8c54-816aa4f8c502:[a-zA-Z0-9]{64}"
+  required: true
+- name: WHISK_GUEST_AUTH
+  description: OpenWhisk Auth token for guest account
+  generate: expression
+  from: "23bc46b1-71f6-4ed5-8c54-816aa4f8c502:[a-zA-Z0-9]{64}"
+  required: true
 
 objects:
 - apiVersion: v1
@@ -463,6 +487,16 @@ objects:
             value: "5984"
           - name: "NODENAME"
             value: "couchdb0"
+          - name: "AUTH_WHISK_SYSTEM"
+            valueFrom:
+              secretKeyRef:
+                name: whisk.auth
+                key: system
+          - name: "AUTH_GUEST"
+            valueFrom:
+              secretKeyRef:
+                name: whisk.auth
+                key: guest
           volumeMounts:
           - name: couchdb-data
             mountPath: "/opt/couchdb/data"
@@ -952,18 +986,16 @@ objects:
   kind: Secret
   metadata:
     name: whisk.auth
-  type: Opaque
-  data:
-    guest: MjNiYzQ2YjEtNzFmNi00ZWQ1LThjNTQtODE2YWE0ZjhjNTAyOjEyM3pPM3haQ0xyTU42djJCS0sxZFhZRnBYbFBrY2NPRnFtMTJDZEFzTWdSVTRWck5aOWx5R1ZDR3VNREdJd1A=
-    system: Nzg5YzQ2YjEtNzFmNi00ZWQ1LThjNTQtODE2YWE0ZjhjNTAyOmFiY3pPM3haQ0xyTU42djJCS0sxZFhZRnBYbFBrY2NPRnFtMTJDZEFzTWdSVTRWck5aOWx5R1ZDR3VNREdJd1A=
+  stringData:
+    guest: "${WHISK_GUEST_AUTH}"
+    system: "${WHISK_SYSTEM_AUTH}"
 - apiVersion: v1
   kind: Secret
   metadata:
     name: db.auth
-  type: Opaque
-  data:
-    db_password: Y291Y2hfcGFzc3dvcmQ=
-    db_username: Y291Y2hfdXNlcm5hbWU=
+  stringData:
+    db_username: "${COUCHDB_USER}"
+    db_password: "${COUCHDB_PASSWORD}"
 - apiVersion: v1
   kind: Service
   metadata:

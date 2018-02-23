@@ -165,7 +165,7 @@ ROOTDIR="$SCRIPTDIR/../../"
 cd $ROOTDIR
 
 oc new-project openwhisk
-oc create -f openshift/
+oc process -f openshift/extra/templates.yml | oc create -f -
 
 couchdbHealthCheck
 
