@@ -8,19 +8,43 @@ labels:
 parameters:
 - name: CONTROLLER_INSTANCES
   description: The desired number of controllers
-  value: "2"
+  value: "1"
+  required: true
+- name: CONTROLLER_MEMORY_LIMIT
+  description: The maximum container memory for each Controller
+  value: "512Mi"
+  required: true
+- name: CONTROLLER_JAVA_OPTS
+  description: JVM options to pass to the Controller - recommended to set at least Xmx here
+  value: "-Xmx256m"
   required: true
 - name: CONTROLLER_HA
   description: Boolean denoting whether HA mode
-  value: "TRUE"
+  value: "FALSE"
   required: true
 - name: CONTROLLER_LOCALBOOKKEEPING
   description: Boolean denoting whether load balancer data is local or shared
-  value: "FALSE"
+  value: "TRUE"
   required: true
 - name: AKKA_CLUSTER_SEED_NODES
   description: Hostnames of akka seed nodes
   value: "controller-0.controller controller-1.controller"
+  required: true
+- name: INVOKER_INSTANCES
+  description: The desired number of invokers
+  value: "1"
+  required: true
+- name: INVOKER_MEMORY_LIMIT
+  description: The maximum container memory for each Invoker
+  value: "1Gi"
+  required: true
+- name: INVOKER_JAVA_OPTS
+  description: JVM options to pass to the Invoker - recommended to set at least Xmx here
+  value: "-Xmx512m"
+  required: true
+- name: COUCHDB_MEMORY_LIMIT
+  description: The maximum container memory for each CouchDB
+  value: "512Mi"
   required: true
 - name: COUCHDB_USER
   description: CouchDB Username
@@ -31,6 +55,14 @@ parameters:
   description: CouchDB Password
   generate: expression
   from: "[a-zA-Z0-9]{16}"
+  required: true
+- name: KAFKA_MEMORY_LIMIT
+  description: The maximum container memory for each Kafka
+  value: "512Mi"
+  required: true
+- name: KAFKA_JAVA_OPTS
+  description: JVM options to pass to Kafka - recommended to set at least Xmx here
+  value: "-Xmx256m"
   required: true
 - name: WHISK_SYSTEM_AUTH
   description: OpenWhisk Auth token for whisk.system account
@@ -202,7 +234,7 @@ objects:
     name: controller.config
   data:
     controller_opts: ""
-    java_opts: -Xmx2g
+    java_opts: "${CONTROLLER_JAVA_OPTS}"
 - apiVersion: apps/v1beta1
   kind: StatefulSet
   metadata:
@@ -228,7 +260,7 @@ objects:
             containerPort: 8080
           resources:
             limits:
-              memory: 1Gi
+              memory: ${CONTROLLER_MEMORY_LIMIT}
           env:
           # Properties for controller HA configuration
           # Must change these if changing number of replicas
@@ -464,7 +496,7 @@ objects:
             containerPort: 5984
           resources:
             limits:
-              memory: 1Gi
+              memory: ${COUCHDB_MEMORY_LIMIT}
           env:
           - name: "DB_PREFIX"
             valueFrom:
@@ -523,7 +555,7 @@ objects:
     invoker_logs_dir: ""
     invoker_opts: "-Dwhisk.spi.ContainerFactoryProvider=whisk.core.containerpool.kubernetes.KubernetesContainerFactoryProvider"
     invoker_use_runc: "false"
-    java_opts: -Xmx2g
+    java_opts: "${INVOKER_JAVA_OPTS}"
 - apiVersion: v1
   kind: ConfigMap
   metadata:
@@ -558,7 +590,7 @@ objects:
     labels:
       name: invoker
   spec:
-    replicas: 1
+    replicas: ${INVOKER_INSTANCES}
     serviceName: "invoker"
     template:
       metadata:
@@ -590,7 +622,7 @@ objects:
             containerPort: 8080
           resources:
             limits:
-              memory: 1Gi
+              memory: ${INVOKER_MEMORY_LIMIT}
           volumeMounts:
           - name: invoker-config
             mountPath: "/invoker_config"
@@ -796,7 +828,7 @@ objects:
             containerPort: 9092
           resources:
             limits:
-              memory: 1Gi
+              memory: ${KAFKA_MEMORY_LIMIT}
           env:
           - name: "KAFKA_BROKER_ID"
             value: "0"
@@ -810,6 +842,8 @@ objects:
                 fieldPath: status.podIP
           - name: "KAFKA_PORT"
             value: "$(KAFKA_SERVICE_PORT_KAFKA)"
+          - name: "KAFKA_HEAP_OPTS"
+            value: "${KAFKA_JAVA_OPTS}"
   
           # Need a writeable volume for OpenShift
           - name: "KAFKA_LOG_DIRS"

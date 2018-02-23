@@ -14,6 +14,13 @@ configure the `wsk` CLI to use your cluster:
     AUTH_SECRET=$(oc get secret whisk.auth -o yaml | grep "system:" | awk '{print $2}' | base64 --decode)
     wsk property set --auth $AUTH_SECRET --apihost $(oc get route/openwhisk --template={{.spec.host}})
 
+# Sensible defaults for larger clusters
+
+There are some sensible defaults for larger clusters in
+openshift/extras/larger.env that you can use like:
+
+    oc process -f openshift/extras/template.yml --param-file=openshift/extras/larger.env | oc create -f -
+
 # Installing on minishift
 
 These instructions assume you've cloned this repo, cd'd into it, and
