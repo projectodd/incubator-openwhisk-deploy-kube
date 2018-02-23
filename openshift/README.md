@@ -20,6 +20,10 @@ There are some sensible defaults for larger clusters in
 openshift/extras/larger.env that you can use like:
 
     oc process -f openshift/extras/template.yml --param-file=openshift/extras/larger.env | oc create -f -
+# Testing performance with `ab`
+
+    AUTH_SECRET=$(oc get secret whisk.auth -o yaml | grep "system:" | awk '{print $2}' | base64 --decode)
+    ab -c 5 -n 300 -k -m POST -H "Authorization: Basic $(echo $AUTH_SECRET | base64 -w 0)" "https://$(oc get route/openwhisk --template={{.spec.host}})/api/v1/namespaces/whisk.system/actions/utils/echo?blocking=true&result=true"
 
 # Installing on minishift
 
