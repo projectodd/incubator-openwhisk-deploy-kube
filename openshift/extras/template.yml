@@ -42,6 +42,10 @@ parameters:
   description: JVM options to pass to the Invoker - recommended to set at least Xmx here
   value: "-Xmx512m"
   required: true
+- name: INVOKER_MAX_CONTAINERS
+  description: Maximum function containers per Invoker
+  value: "8"
+  required: true
 - name: COUCHDB_MEMORY_LIMIT
   description: The maximum container memory for each CouchDB
   value: "512Mi"
@@ -74,6 +78,18 @@ parameters:
   generate: expression
   from: "23bc46b1-71f6-4ed5-8c54-816aa4f8c502:[a-zA-Z0-9]{64}"
   required: true
+- name: WHISK_ACTIONS_INVOKES_CONCURRENT
+  description: Default number of concurrenct actions per user
+  value: "30"
+  required: true
+- name: WHISK_ACTIONS_INVOKES_CONCURRENT_IN_SYSTEM
+  description: Number of concurrent actions allowed across the entire system
+  value: "1000"
+  required: true
+- name: WHISK_ACTIONS_INVOKES_PER_MINUTE
+  description: Default number of action invocations per minute per user
+  value: "60"
+  required: true
 
 objects:
 - apiVersion: v1
@@ -92,9 +108,9 @@ objects:
     creationTimestamp: null
     name: whisk.limits
   data:
-    actions_invokes_concurrent: "30"
-    actions_invokes_concurrentInSystem: "5000"
-    actions_invokes_perMinute: "60"
+    actions_invokes_concurrent: "${WHISK_ACTIONS_INVOKES_CONCURRENT}"
+    actions_invokes_concurrentInSystem: "${WHISK_ACTIONS_INVOKES_CONCURRENT_IN_SYSTEM}"
+    actions_invokes_perMinute: "${WHISK_ACTIONS_INVOKES_PER_MINUTE}"
     actions_sequence_maxLength: "50"
     triggers_fires_perMinute: "60"
 - apiVersion: v1
@@ -652,6 +668,10 @@ objects:
                 configMapKeyRef:
                   name: invoker.config
                   key: invoker_use_runc
+            - name: "INVOKER_CORESHARE"
+              value: "1"
+            - name: "INVOKER_NUMCORE"
+              value: "${INVOKER_MAX_CONTAINERS}"
             - name: "DOCKER_IMAGE_PREFIX"
               valueFrom:
                 configMapKeyRef:
