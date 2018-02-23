@@ -75,6 +75,16 @@ spec:
           value: "5984"
         - name: "NODENAME"
           value: "couchdb0"
+        - name: "AUTH_WHISK_SYSTEM"
+          valueFrom:
+            secretKeyRef:
+              name: whisk.auth
+              key: system
+        - name: "AUTH_GUEST"
+          valueFrom:
+            secretKeyRef:
+              name: whisk.auth
+              key: guest
         volumeMounts:
         - name: couchdb-data
           mountPath: "/opt/couchdb/data"
