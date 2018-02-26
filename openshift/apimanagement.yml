@@ -22,17 +22,12 @@ spec:
               secretKeyRef:
                 name: whisk.auth
                 key: system
-          - name: "WHISK_API_HOST_NAME"
-            valueFrom:
-              configMapKeyRef:
-                name: apigateway
-                key: api_host
           - name: "WHISK_NAMESPACE"
             valueFrom:
               configMapKeyRef:
                 name: whisk.config
                 key: whisk_system_namespace
-          - name: "WHISK_API_GATEWAY_HOST_V2"
-            value: "http://$(APIGATEWAY_SERVICE_HOST):$(APIGATEWAY_SERVICE_PORT_API)/v2"
+        #  - name: "WHISK_API_GATEWAY_HOST_V2"
+        #    value: "http://$(APIGATEWAY_SERVICE_HOST):$(APIGATEWAY_SERVICE_PORT_API)/v2"
 
       restartPolicy: Never

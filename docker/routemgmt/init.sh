@@ -5,6 +5,13 @@ set -e
 
 export OPENWHISK_HOME=/openwhisk
 
+# Dynamically determine API gateway host
+export TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+export NAMESPACE="$(cat /run/secrets/kubernetes.io/serviceaccount/namespace)"
+export _WHISK_API_GATEWAY_HOST=$(curl -s --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer ${TOKEN}" "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/oapi/v1/namespaces/${NAMESPACE}/routes/openwhisk?pretty=true" | grep '"host":' | head -n 1 | awk -F '"' '{print $4}')
+export _WHISK_API_GATEWAY_HOST_V2=${_WHISK_API_GATEWAY_HOST}
+export WHISK_API_HOST_NAME=${_WHISK_API_GATEWAY_HOST}
+
 # Clone openwhisk repo to get latest installRouteMgmt.sh and core/routemgmt
 # TODO: when OpenWhisk has releases, download release artifacts instead!
 git clone https://github.com/apache/incubator-openwhisk openwhisk
@@ -31,9 +38,12 @@ fi
 if [ "$WHISK_API_GATEWAY_HOST_V2" ]; then
     export GW_HOST_V2=$WHISK_API_GATEWAY_HOST_V2
 else
-    echo "Must provide a value for WHISK_API_GATEWAY_HOST_V2"
-    exit 1
+    echo "Using computed value for WHISK_API_GATEWAY_HOST_V2 as ${APIGW_HOST_V2}"
+    # echo "Must provide a value for WHISK_API_GATEWAY_HOST_V2"
+    # exit 1
+    export GW_HOST_V2="http://${APIGW_HOST_V2}/v2"
 fi
+
 
 # Run installRouteMgmt.sh
 pushd ansible/roles/routemgmt/files

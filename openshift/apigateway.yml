@@ -8,9 +8,9 @@ metadata:
   name: apigateway
 data:
   # TODO remove form hardcode
-  api_host: openwhisk-openwhisk.192.168.64.58.nip.io
+  # api_host: openwhisk-openwhisk.192.168.64.65.nip.io
   # TODO remove form hardcode
-  apigw_url: http://apigateway-openwhisk.192.168.64.58.nip.io
+  # apigw_url: http://apigateway-openwhisk.192.168.64.65.nip.io
   redis_host: "redis"
   redis_port: "6379"
 ########################################
@@ -87,6 +87,7 @@ spec:
         name: apigateway
     spec:
       restartPolicy: Always
+      serviceAccountName: openwhisk
       containers:
       - name: apigateway
         imagePullPolicy: IfNotPresent
@@ -107,11 +108,11 @@ spec:
             configMapKeyRef:
                 name: apigateway
                 key: redis_port
-        - name: "PUBLIC_GATEWAY_URL"
-          valueFrom:
-            configMapKeyRef:
-                name: apigateway
-                key: apigw_url
+        # - name: "PUBLIC_GATEWAY_URL"
+        #   valueFrom:
+        #     configMapKeyRef:
+        #         name: apigateway
+        #         key: apigw_url       
   triggers: 
     - type: ConfigChange
 
