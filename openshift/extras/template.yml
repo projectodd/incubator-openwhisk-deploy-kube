@@ -8,16 +8,88 @@ labels:
 parameters:
 - name: CONTROLLER_INSTANCES
   description: The desired number of controllers
-  value: "2"
+  value: "1"
+  required: true
+- name: CONTROLLER_MEMORY_LIMIT
+  description: The maximum container memory for each Controller
+  value: "512Mi"
+  required: true
+- name: CONTROLLER_JAVA_OPTS
+  description: JVM options to pass to the Controller - recommended to set at least Xmx here
+  value: "-Xmx256m"
+  required: true
 - name: CONTROLLER_HA
   description: Boolean denoting whether HA mode
-  value: "TRUE"
+  value: "FALSE"
+  required: true
 - name: CONTROLLER_LOCALBOOKKEEPING
   description: Boolean denoting whether load balancer data is local or shared
-  value: "FALSE"
+  value: "TRUE"
+  required: true
 - name: AKKA_CLUSTER_SEED_NODES
   description: Hostnames of akka seed nodes
   value: "controller-0.controller controller-1.controller"
+  required: true
+- name: INVOKER_INSTANCES
+  description: The desired number of invokers
+  value: "1"
+  required: true
+- name: INVOKER_MEMORY_LIMIT
+  description: The maximum container memory for each Invoker
+  value: "1Gi"
+  required: true
+- name: INVOKER_JAVA_OPTS
+  description: JVM options to pass to the Invoker - recommended to set at least Xmx here
+  value: "-Xmx512m"
+  required: true
+- name: INVOKER_MAX_CONTAINERS
+  description: Maximum function containers per Invoker
+  value: "8"
+  required: true
+- name: COUCHDB_MEMORY_LIMIT
+  description: The maximum container memory for each CouchDB
+  value: "512Mi"
+  required: true
+- name: COUCHDB_USER
+  description: CouchDB Username
+  generate: expression
+  from: "user[A-Z0-9]{3}"
+  required: true
+- name: COUCHDB_PASSWORD
+  description: CouchDB Password
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+  required: true
+- name: KAFKA_MEMORY_LIMIT
+  description: The maximum container memory for each Kafka
+  value: "512Mi"
+  required: true
+- name: KAFKA_JAVA_OPTS
+  description: JVM options to pass to Kafka - recommended to set at least Xmx here
+  value: "-Xmx256m"
+  required: true
+- name: WHISK_SYSTEM_AUTH
+  description: OpenWhisk Auth token for whisk.system account
+  generate: expression
+  from: "789c46b1-71f6-4ed5-8c54-816aa4f8c502:[a-zA-Z0-9]{64}"
+  required: true
+- name: WHISK_GUEST_AUTH
+  description: OpenWhisk Auth token for guest account
+  generate: expression
+  from: "23bc46b1-71f6-4ed5-8c54-816aa4f8c502:[a-zA-Z0-9]{64}"
+  required: true
+- name: WHISK_ACTIONS_INVOKES_CONCURRENT
+  description: Default number of concurrenct actions per user
+  value: "30"
+  required: true
+- name: WHISK_ACTIONS_INVOKES_CONCURRENT_IN_SYSTEM
+  description: Number of concurrent actions allowed across the entire system
+  value: "1000"
+  required: true
+- name: WHISK_ACTIONS_INVOKES_PER_MINUTE
+  description: Default number of action invocations per minute per user
+  value: "60"
+  required: true
 
 objects:
 - apiVersion: v1
@@ -36,9 +108,9 @@ objects:
     creationTimestamp: null
     name: whisk.limits
   data:
-    actions_invokes_concurrent: "30"
-    actions_invokes_concurrentInSystem: "5000"
-    actions_invokes_perMinute: "60"
+    actions_invokes_concurrent: "${WHISK_ACTIONS_INVOKES_CONCURRENT}"
+    actions_invokes_concurrentInSystem: "${WHISK_ACTIONS_INVOKES_CONCURRENT_IN_SYSTEM}"
+    actions_invokes_perMinute: "${WHISK_ACTIONS_INVOKES_PER_MINUTE}"
     actions_sequence_maxLength: "50"
     triggers_fires_perMinute: "60"
 - apiVersion: v1
@@ -178,7 +250,7 @@ objects:
     name: controller.config
   data:
     controller_opts: ""
-    java_opts: -Xmx2g
+    java_opts: "${CONTROLLER_JAVA_OPTS}"
 - apiVersion: apps/v1beta1
   kind: StatefulSet
   metadata:
@@ -204,7 +276,7 @@ objects:
             containerPort: 8080
           resources:
             limits:
-              memory: 1Gi
+              memory: ${CONTROLLER_MEMORY_LIMIT}
           env:
           # Properties for controller HA configuration
           # Must change these if changing number of replicas
@@ -338,17 +410,19 @@ objects:
               path: "/ping"
               port: 8080
               scheme: "HTTP"
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
-            timeoutSeconds: 1
+            timeoutSeconds: 10
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: "/ping"
               port: 8080
               scheme: "HTTP"
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 5
-            timeoutSeconds: 1
+            timeoutSeconds: 10
+            failureThreshold: 5
         initContainers:
         - name: wait-for-services
           image: busybox
@@ -438,7 +512,7 @@ objects:
             containerPort: 5984
           resources:
             limits:
-              memory: 1Gi
+              memory: ${COUCHDB_MEMORY_LIMIT}
           env:
           - name: "DB_PREFIX"
             valueFrom:
@@ -461,6 +535,16 @@ objects:
             value: "5984"
           - name: "NODENAME"
             value: "couchdb0"
+          - name: "AUTH_WHISK_SYSTEM"
+            valueFrom:
+              secretKeyRef:
+                name: whisk.auth
+                key: system
+          - name: "AUTH_GUEST"
+            valueFrom:
+              secretKeyRef:
+                name: whisk.auth
+                key: guest
           volumeMounts:
           - name: couchdb-data
             mountPath: "/opt/couchdb/data"
@@ -487,17 +571,15 @@ objects:
     invoker_logs_dir: ""
     invoker_opts: "-Dwhisk.spi.ContainerFactoryProvider=whisk.core.containerpool.kubernetes.KubernetesContainerFactoryProvider"
     invoker_use_runc: "false"
-    java_opts: -Xmx2g
+    java_opts: "${INVOKER_JAVA_OPTS}"
 - apiVersion: v1
   kind: ConfigMap
   metadata:
     name: invoker
   data:
     init: |
-      export ORDINAL=$(hostname | cut -d'-' -f2)
-      echo "Waiting for controller to be available"
-      until $(curl --output /dev/null --silent --head --fail http://controller:8080/ping); do printf '.'; sleep 1; done
-      export COMPONENT_NAME=${ORDINAL}
+      export COMPONENT_NAME=$(hostname | cut -d'-' -f2)
+      # Dynamically determine API gateway host
       export TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
       export NAMESPACE="$(cat /run/secrets/kubernetes.io/serviceaccount/namespace)"
       export APIGW_HOST=$(curl -s --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer ${TOKEN}" "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/oapi/v1/namespaces/${NAMESPACE}/routes/openwhisk?pretty=true" | grep '"host":' | head -n 1 | awk -F '"' '{print $4}')
@@ -524,7 +606,7 @@ objects:
     labels:
       name: invoker
   spec:
-    replicas: 1
+    replicas: ${INVOKER_INSTANCES}
     serviceName: "invoker"
     template:
       metadata:
@@ -542,6 +624,9 @@ objects:
         - name: wait-for-services
           image: busybox
           command: ['sh', '-cu', 'echo "$COUCHDB_SERVICE_HOST $ZOOKEEPER_SERVICE_HOST $KAFKA_SERVICE_HOST"']
+        - name: wait-for-controller
+          image: busybox
+          command: ['sh', '-c', 'until wget -T 5 --spider http://controller:8080/ping; do echo waiting for controller; sleep 2; done;']
   
         containers:
         - name: invoker
@@ -553,7 +638,7 @@ objects:
             containerPort: 8080
           resources:
             limits:
-              memory: 1Gi
+              memory: ${INVOKER_MEMORY_LIMIT}
           volumeMounts:
           - name: invoker-config
             mountPath: "/invoker_config"
@@ -583,6 +668,10 @@ objects:
                 configMapKeyRef:
                   name: invoker.config
                   key: invoker_use_runc
+            - name: "INVOKER_CORESHARE"
+              value: "1"
+            - name: "INVOKER_NUMCORE"
+              value: "${INVOKER_MAX_CONTAINERS}"
             - name: "DOCKER_IMAGE_PREFIX"
               valueFrom:
                 configMapKeyRef:
@@ -759,7 +848,7 @@ objects:
             containerPort: 9092
           resources:
             limits:
-              memory: 1Gi
+              memory: ${KAFKA_MEMORY_LIMIT}
           env:
           - name: "KAFKA_BROKER_ID"
             value: "0"
@@ -773,6 +862,8 @@ objects:
                 fieldPath: status.podIP
           - name: "KAFKA_PORT"
             value: "$(KAFKA_SERVICE_PORT_KAFKA)"
+          - name: "KAFKA_HEAP_OPTS"
+            value: "${KAFKA_JAVA_OPTS}"
   
           # Need a writeable volume for OpenShift
           - name: "KAFKA_LOG_DIRS"
@@ -949,18 +1040,16 @@ objects:
   kind: Secret
   metadata:
     name: whisk.auth
-  type: Opaque
-  data:
-    guest: MjNiYzQ2YjEtNzFmNi00ZWQ1LThjNTQtODE2YWE0ZjhjNTAyOjEyM3pPM3haQ0xyTU42djJCS0sxZFhZRnBYbFBrY2NPRnFtMTJDZEFzTWdSVTRWck5aOWx5R1ZDR3VNREdJd1A=
-    system: Nzg5YzQ2YjEtNzFmNi00ZWQ1LThjNTQtODE2YWE0ZjhjNTAyOmFiY3pPM3haQ0xyTU42djJCS0sxZFhZRnBYbFBrY2NPRnFtMTJDZEFzTWdSVTRWck5aOWx5R1ZDR3VNREdJd1A=
+  stringData:
+    guest: "${WHISK_GUEST_AUTH}"
+    system: "${WHISK_SYSTEM_AUTH}"
 - apiVersion: v1
   kind: Secret
   metadata:
     name: db.auth
-  type: Opaque
-  data:
-    db_password: Y291Y2hfcGFzc3dvcmQ=
-    db_username: Y291Y2hfdXNlcm5hbWU=
+  stringData:
+    db_username: "${COUCHDB_USER}"
+    db_password: "${COUCHDB_PASSWORD}"
 - apiVersion: v1
   kind: Service
   metadata:
