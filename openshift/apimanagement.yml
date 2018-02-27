@@ -8,9 +8,19 @@ spec:
     metadata:
       name: install-apimanagement
     spec:
+      serviceAccountName: openwhisk
+      volumes:
+      - name: apimgmt-config
+        configMap:
+          name: apigateway
+          items:
+           - key: apimgmt-init
+             path: init
       containers:
       - name: apimanagement
         image: docker.io/openwhisk/kube-routemgmt
+        command: [ "/bin/bash", "-o", "allexport", "/apimgmt-config/init" ]
+        imagePullPolicy: IfNotPresent
         env:
           - name: "WHISK_CLI_VERSION"
             valueFrom:
@@ -27,7 +37,9 @@ spec:
               configMapKeyRef:
                 name: whisk.config
                 key: whisk_system_namespace
-        #  - name: "WHISK_API_GATEWAY_HOST_V2"
-        #    value: "http://$(APIGATEWAY_SERVICE_HOST):$(APIGATEWAY_SERVICE_PORT_API)/v2"
-
+          - name: "WHISK_API_GATEWAY_HOST_V2"
+            value: "http://$(APIGATEWAY_SERVICE_HOST):$(APIGATEWAY_SERVICE_PORT_API)/v2"
+        volumeMounts:
+        - name: apimgmt-config
+          mountPath: "/apimgmt-config"
       restartPolicy: Never

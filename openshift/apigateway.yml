@@ -7,12 +7,24 @@ kind: ConfigMap
 metadata:
   name: apigateway
 data:
-  # TODO remove form hardcode
-  # api_host: openwhisk-openwhisk.192.168.64.65.nip.io
-  # TODO remove form hardcode
-  # apigw_url: http://apigateway-openwhisk.192.168.64.65.nip.io
-  redis_host: "redis"
-  redis_port: "6379"
+  apimgmt-init: |
+    # Dynamically determine API gateway host
+    export TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+    export NAMESPACE="$(cat /run/secrets/kubernetes.io/serviceaccount/namespace)"
+    export WHISK_API_GATEWAY_HOST=$(wget -q -O - -o /dev/null --ca-certificate='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' --header="Authorization: Bearer ${TOKEN}" "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/oapi/v1/namespaces/${NAMESPACE}/routes/openwhisk?pretty=true" | grep '"host":' | head -n 1 | awk -F '"' '{print $4}')
+    export WHISK_API_HOST_NAME="${WHISK_API_GATEWAY_HOST}"
+    export PUBLIC_GATEWAY_URL="${WHISK_API_GATEWAY_HOST}"
+    exec /init.sh 
+  apigateway-init: |
+    # Dynamically determine API gateway host and other environment variables
+    export TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+    export NAMESPACE="$(cat /run/secrets/kubernetes.io/serviceaccount/namespace)"
+    export WHISK_API_GATEWAY_HOST=$(wget -q -O - -o /dev/null --ca-certificate='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt' --header="Authorization: Bearer ${TOKEN}" "https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/oapi/v1/namespaces/${NAMESPACE}/routes/openwhisk?pretty=true" | grep '"host":' | head -n 1 | awk -F '"' '{print $4}')
+    export WHISK_API_HOST_NAME="${WHISK_API_GATEWAY_HOST}"
+    export PUBLIC_GATEWAY_URL="http://${WHISK_API_GATEWAY_HOST}"
+    # with current bug in minishift its not able to resolve short dns names
+    # https://github.com/minishift/minishift/issues/2070
+    exec env REDIS_HOST="redis.${NAMESPACE}.svc.cluster.local" /etc/init-container.sh
 ########################################
 # START REDIS Deployment
 ########################################
@@ -25,7 +37,7 @@ metadata:
   name: redis
 spec:
   ports:
-  - name: redis-6379
+  - name: redis
     port: 6379
   selector:
     app: redis
@@ -88,31 +100,31 @@ spec:
     spec:
       restartPolicy: Always
       serviceAccountName: openwhisk
+      volumes:
+      - name: apigateway-config
+        configMap:
+          name: apigateway
+          items:
+          - key: apigateway-init
+            path: init
       containers:
       - name: apigateway
         imagePullPolicy: IfNotPresent
         image: docker.io/openwhisk/apigateway
+        command: [ "/bin/bash", "-o", "allexport", "/apigateway-config/init" ]
         ports:
         - name: mgmt
           containerPort: 8080
         - name: api
           containerPort: 9000
-        env:
-        - name: "REDIS_HOST"
-          valueFrom:
-            configMapKeyRef:
-                name: apigateway
-                key: redis_host
-        - name: "REDIS_PORT"
-          valueFrom:
-            configMapKeyRef:
-                name: apigateway
-                key: redis_port
-        # - name: "PUBLIC_GATEWAY_URL"
-        #   valueFrom:
-        #     configMapKeyRef:
-        #         name: apigateway
-        #         key: apigw_url       
+        env: 
+        # - name: REDIS_HOST
+        #   value: "redis.openwhisk.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        volumeMounts:
+        - name: apigateway-config
+          mountPath: "/apigateway-config"
   triggers: 
     - type: ConfigChange
 
